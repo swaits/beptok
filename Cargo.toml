@@ -1,6 +1,6 @@
 [package]
 name = "bpetok"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Stephen Waits <steve@waits.net>"]
 description = "A simple CLI for tokenizing text input using Byte Pair Encoding (BPE)."
@@ -10,5 +10,9 @@ categories = ["command-line-utilities", "text-processing"]
 
 [dependencies]
 anyhow = "1.0.89"
-bpe-tokenizer = { version = "0.1.4", features = ["default-small", "default-medium", "default-large"] }
+bpe-tokenizer = { version = "0.1.4", features = [
+  "default-small",
+  "default-medium",
+  "default-large",
+] }
 clap = { version = "4.5.18", features = ["derive"] }
