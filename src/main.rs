@@ -3,7 +3,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bpe_tokenizer::BytePairEncoder;
 use clap::{ArgAction, Parser};
 
@@ -13,18 +13,18 @@ use clap::{ArgAction, Parser};
 #[derive(Parser)]
 #[command(version, about, long_about, author)]
 #[group(multiple = false)]
-struct Cli {
+struct VocabularyOption {
     /// Use built-in small vocabulary (100k).
     #[arg(short, long, action = ArgAction::SetTrue)]
-    small: Option<bool>,
+    small: bool,
 
     /// Use built-in medium vocabulary (320k) [default]
-    #[arg(short, long, action = ArgAction::SetTrue, default_value = "true")]
-    medium: Option<bool>,
+    #[arg(short, long, action = ArgAction::SetTrue, default_value_t = true)]
+    medium: bool,
 
     /// Use built-in large vocabulary (1M).
     #[arg(short, long, action = ArgAction::SetTrue)]
-    large: Option<bool>,
+    large: bool,
 
     /// Path to custom BPE vocabulary file.
     #[arg(short, long, value_name = "FILE")]
@@ -33,31 +33,25 @@ struct Cli {
 
 fn main() -> Result<()> {
     // Parse CLI arguments
-    let cli = Cli::parse();
+    let options = VocabularyOption::parse();
 
     // Load vocabulary
-    let bpe = if let Some(vocab_path) = cli.vocab.as_deref() {
-        BytePairEncoder::new_from_file(
-            vocab_path
-                .to_str()
-                .ok_or(anyhow::anyhow!("Invalid vocabulary path"))?,
-        )?
-    } else if cli.small.unwrap_or(false) {
-        BytePairEncoder::new_default_small()?
-    } else if cli.large.unwrap_or(false) {
-        BytePairEncoder::new_default_large()?
-    } else {
-        BytePairEncoder::new_default_medium()?
+    let bpe = match options.vocab {
+        Some(ref vocab_path) => BytePairEncoder::new_from_file(&vocab_path.to_string_lossy())?,
+        _ if options.small => BytePairEncoder::new_default_small()?,
+        _ if options.large => BytePairEncoder::new_default_large()?,
+        _ => BytePairEncoder::new_default_medium()?, // Default case is medium
     };
 
-    // Create a buffer reader for stdin
+    // Buffer reader for stdin
     let reader = BufReader::new(io::stdin().lock());
 
-    // Iterate over the lines of stdin while tokenizing and emitting to stdout
-    for line in reader.lines().map_while(Result::ok) {
-        bpe.tokenize_iter(&line).for_each(|t| {
-            println!("{}", t);
-        });
+    // Process each line, tokenize, and print tokens
+    for line_result in reader.lines() {
+        let line = line_result.context("Failed to read line from stdin")?;
+        for token in bpe.tokenize_iter(&line) {
+            println!("{}", token);
+        }
         io::stdout().flush()?;
     }
 
